@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "build": {
     "devUrl": "http://localhost:5173",
-    "frontendDist": "../app"
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../app/dist"
   },
   "app": {
     "security": {

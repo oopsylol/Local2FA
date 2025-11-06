@@ -6,6 +6,7 @@
   "scripts": {
     "start": "serve app",
     "dev": "vite",
+    "build": "vite build",
     "tauri:dev": "tauri dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
