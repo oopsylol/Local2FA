@@ -15,11 +15,11 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: "--target aarch64-apple-darwin"
+            args: "--target aarch64-apple-darwin --bundles macos-app,macos-dmg"
           - platform: macos-latest
-            args: "--target x86_64-apple-darwin"
+            args: "--target x86_64-apple-darwin --bundles macos-app,macos-dmg"
           - platform: windows-latest
-            args: ""
+            args: "--bundles windows-nsis"
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
