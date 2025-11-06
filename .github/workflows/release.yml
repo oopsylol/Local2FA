@@ -50,7 +50,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_BUNDLER_DMG_IGNORE_CI: false
         with:
-          tauriScript: "cargo tauri"
+          projectPath: ./src-tauri
           tagName: ${{ github.ref_name }}
           releaseName: "Local2FA ${{ github.ref_name }}"
           releaseDraft: false
