@@ -12,6 +12,7 @@ use std::thread;
 use rand::RngCore;
 use chacha20poly1305::{aead::Aead, aead::KeyInit, ChaCha20Poly1305, Key, Nonce};
 use argon2::{Argon2, Algorithm, Params, Version};
+use base64::{engine::general_purpose, Engine as _};
 
 #[tauri::command]
 fn generate_qr(url: String) -> Result<String, String> {
@@ -87,18 +88,18 @@ fn encrypt_json(key_bytes: &[u8; 32], plaintext: &str) -> serde_json::Value {
         "aead": "chacha20poly1305",
         "kdf": "argon2id",
         "params": {"m": 19456, "t": 2, "p": 1},
-        "salt": base64::encode(salt),
-        "nonce": base64::encode(nonce_bytes),
-        "ciphertext": base64::encode(ct)
+        "salt": general_purpose::STANDARD.encode(salt),
+        "nonce": general_purpose::STANDARD.encode(nonce_bytes),
+        "ciphertext": general_purpose::STANDARD.encode(ct)
     })
 }
 
 fn try_decrypt_json(key_bytes: &[u8; 32], wrapper: &serde_json::Value) -> Result<String, String> {
-    let salt_b64 = wrapper.get("salt").and_then(|v| v.as_str()).ok_or("missing salt")?;
+    let _salt_b64 = wrapper.get("salt").and_then(|v| v.as_str()).ok_or("missing salt")?;
     let nonce_b64 = wrapper.get("nonce").and_then(|v| v.as_str()).ok_or("missing nonce")?;
     let ct_b64 = wrapper.get("ciphertext").and_then(|v| v.as_str()).ok_or("missing ciphertext")?;
-    let nonce_bytes = base64::decode(nonce_b64).map_err(|e| e.to_string())?;
-    let ct = base64::decode(ct_b64).map_err(|e| e.to_string())?;
+    let nonce_bytes = general_purpose::STANDARD.decode(nonce_b64).map_err(|e| e.to_string())?;
+    let ct = general_purpose::STANDARD.decode(ct_b64).map_err(|e| e.to_string())?;
     if nonce_bytes.len() != 12 { return Err("invalid nonce".into()); }
     let cipher = ChaCha20Poly1305::new(Key::from_slice(key_bytes));
     let nonce = Nonce::from_slice(&nonce_bytes);
@@ -199,9 +200,9 @@ fn set_master_password(app_handle: tauri::AppHandle, state: State<Mutex<AppState
             "aead": "chacha20poly1305",
             "kdf": "argon2id",
             "params": {"m": 19456, "t": 2, "p": 1},
-            "salt": base64::encode(salt),
-            "nonce": base64::encode(nonce_bytes),
-            "ciphertext": base64::encode(ct)
+            "salt": general_purpose::STANDARD.encode(salt),
+            "nonce": general_purpose::STANDARD.encode(nonce_bytes),
+            "ciphertext": general_purpose::STANDARD.encode(ct)
         })
     };
     fs::create_dir_all(p.parent().unwrap()).map_err(|e| e.to_string())?;
@@ -220,7 +221,7 @@ fn unlock(app_handle: tauri::AppHandle, state: State<Mutex<AppState>>, password:
         return Err("not encrypted".into());
     }
     let salt_b64 = v.get("salt").and_then(|s| s.as_str()).ok_or("missing salt")?;
-    let salt = base64::decode(salt_b64).map_err(|e| e.to_string())?;
+    let salt = general_purpose::STANDARD.decode(salt_b64).map_err(|e| e.to_string())?;
     let key = derive_key(&password, &salt);
     let pt = try_decrypt_json(&key, &v)?;
     state.lock().unwrap().key.replace(key);
@@ -265,8 +266,8 @@ fn write_accounts(app_handle: tauri::AppHandle, state: State<Mutex<AppState>>, d
             "kdf": "argon2id",
             "params": {"m": 19456, "t": 2, "p": 1},
             "salt": salt_b64,
-            "nonce": base64::encode(nonce_bytes),
-            "ciphertext": base64::encode(ct)
+            "nonce": general_purpose::STANDARD.encode(nonce_bytes),
+            "ciphertext": general_purpose::STANDARD.encode(ct)
         });
         fs::write(&p, serde_json::to_string(&wrapper).unwrap()).map_err(|e| e.to_string())?
     } else {
