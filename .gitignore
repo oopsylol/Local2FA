@@ -1,0 +1,25 @@
+# Node/Vite
+node_modules/
+dist/
+.vite/
+
+# Tauri build outputs
+src-tauri/target/
+src-tauri/gen/
+src-tauri/bin/
+
+# Python build outputs
+build/
+dist/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# App bundles and disk images
+*.app/
+*.dmg
+
+# Logs
+*.log

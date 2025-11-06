@@ -1,0 +1,26 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for the application",
+  "windows": ["main"],
+  "remote": {
+    "urls": [
+      "http://localhost:5173/*",
+      "http://127.0.0.1:5173/*",
+      "http://localhost:5176/*",
+      "http://127.0.0.1:5176/*",
+      "http://localhost:5177/*",
+      "http://127.0.0.1:5177/*",
+      "http://localhost:*/*",
+      "http://127.0.0.1:*/*"
+    ]
+  },
+  "permissions": [
+    "core:event:default",
+    "core:window:default",
+    "core:window:allow-set-title",
+    "core:app:default",
+    "core:resources:default",
+    "core:menu:default",
+    "core:tray:default"
+  ]
+}

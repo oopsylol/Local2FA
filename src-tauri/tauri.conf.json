@@ -1,0 +1,35 @@
+{
+  "identifier": "app.local2fa",
+  "productName": "Local2FA",
+  "version": "1.0.0",
+  "build": {
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../app"
+  },
+  "app": {
+    "security": {
+      "capabilities": ["default"]
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Local 2FA Manager",
+        "width": 420,
+        "height": 560,
+        "resizable": true,
+        "minWidth": 360,
+        "minHeight": 420,
+        "url": "index.html"
+      }
+    ]
+  },
+  "bundle": {
+    "icon": [
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
+    "externalBin": [
+      "bin/sidecar"
+    ]
+  }
+}

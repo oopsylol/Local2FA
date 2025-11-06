@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local 2FA Manager</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1 data-i18n="title">Local 2FA Manager</h1>
+    </header>
+
+    <div id="noticeBar" class="notice" role="status" aria-live="polite" style="display:none;"></div>
+
+    <!-- 调试面板已移除 -->
+
+    <section class="controls">
+      <button id="addAccountBtn" data-i18n="add_account">Add Account</button>
+      <!-- Enable/Reset 按钮已移除 -->
+      <!-- 原生 select 作为隐藏的可访问和事件分发层 -->
+      <select id="langSelect" aria-label="Language" class="visually-hidden">
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+      </select>
+      <!-- 自定义下拉控件，与页面风格一致 -->
+      <div id="langSelectUI" class="select-ui" role="button" aria-haspopup="listbox" aria-expanded="false">
+        <span class="select-value">English</span>
+        <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M3 4l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <ul class="select-menu" role="listbox">
+          <li role="option" data-value="zh">中文</li>
+          <li role="option" data-value="en">English</li>
+        </ul>
+      </div>
+    </section>
+
+    <main>
+      <div id="accountsContainer" class="accounts"></div>
+    </main>
+
+    <footer>
+      <a href="https://github.com/oopsylol" class="gh-link" target="_blank" rel="noopener" aria-label="GitHub">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.1 0 0 .67-.21 2.2.82.64-.18 1.33-.27 2.01-.27.68 0 1.37.09 2.01.27 1.53-1.04 2.2-.82 2.2-.82.44 1.09.16 1.9.08 2.1.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.19 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8Z"></path>
+        </svg>
+      </a>
+      <div class="version">v1.0.0</div>
+    </footer>
+
+    <dialog id="accountDialog">
+      <form method="dialog" id="accountForm">
+        <h3 id="dialogTitle" data-i18n="dialog_title_add">Add Account</h3>
+        <div class="field">
+          <label data-i18n="label_name">Account Name</label>
+          <input type="text" id="labelInput" placeholder="e.g., GitHub (Personal)" required />
+        </div>
+        <div class="field">
+          <label data-i18n="label_issuer">Issuer/Service</label>
+          <input type="text" id="issuerInput" placeholder="e.g., GitHub" />
+        </div>
+        <div class="field">
+          <label data-i18n="label_secret">Secret (Base32 or Hex/MD5)</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input style="flex:1" type="text" id="secretInput" placeholder="e.g., JBSWY3DPEHPK3PXP or e10adc3949ba59abbe56e057f20f883e" required />
+            <button type="button" id="importOtpauthBtn" data-i18n="import_otpauth">Import from otpauth URL</button>
+          </div>
+        </div>
+        <div class="field-inline">
+          <div>
+            <label data-i18n="label_digits">Digits</label>
+            <input type="number" id="digitsInput" value="6" min="6" max="8" />
+          </div>
+          <div>
+            <label data-i18n="label_period">Period (seconds)</label>
+            <input type="number" id="periodInput" value="30" min="15" max="90" />
+          </div>
+        </div>
+        <div class="field">
+          <label data-i18n="label_algorithm">Algorithm</label>
+          <select id="algorithmInput">
+            <option value="SHA1" selected data-i18n="alg_sha1">SHA1 (default)</option>
+            <option value="SHA256" data-i18n="alg_sha256">SHA256</option>
+            <option value="SHA512" data-i18n="alg_sha512">SHA512</option>
+          </select>
+        </div>
+        <!-- 内置删除确认条（替代 window.confirm，兼容部分 WebView 环境） -->
+        <div id="deleteConfirmBar" class="confirm-bar" style="display:none;">
+          <span id="deleteConfirmText" data-i18n="confirm_delete">Delete this account?</span>
+          <div class="confirm-actions">
+            <button type="button" id="confirmYesBtn">OK</button>
+            <button type="button" id="confirmNoBtn" data-i18n="btn_cancel">Cancel</button>
+          </div>
+        </div>
+        <menu class="dialog-actions">
+          <button type="button" id="deleteAccountBtn" data-i18n="btn_delete">Delete</button>
+          <button value="cancel" formnovalidate data-i18n="btn_cancel">Cancel</button>
+          <button id="saveAccountBtn" value="default" data-i18n="btn_save">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <template id="accountItemTpl">
+      <div class="account-item">
+        <div class="meta">
+          <div class="name"></div>
+          <div class="issuer"></div>
+        </div>
+        <div class="code"></div>
+        <div class="progress"><div class="bar"></div></div>
+        <div class="countdown"></div>
+        <div class="qr-inline">
+          <img class="qr-img" alt="QR Code" style="display:none;" />
+          <p class="qr-info"></p>
+        </div>
+        <div class="actions">
+          <button class="edit" data-i18n="action_edit">Edit</button>
+          <button class="qr" data-i18n="action_qr">QR Code</button>
+        </div>
+      </div>
+    </template>
+
+    <dialog id="qrDialog">
+      <div class="qr-wrap">
+        <img id="qrImg" alt="QR Code" />
+        <p id="qrInfo"></p>
+        <menu class="dialog-actions">
+          <button value="cancel" data-i18n="qr_close">Close</button>
+        </menu>
+      </div>
+    </dialog>
+
+    <dialog id="masterDialog">
+        <form method="dialog" id="masterForm" novalidate>
+        <h3 id="masterTitle">Set Master Password</h3>
+        <div class="field">
+          <label id="masterPwdLabel">Master Password</label>
+          <input type="password" id="masterPwdInput" />
+        </div>
+        <div class="field" id="masterConfirmRow" style="display:none;">
+          <label id="masterConfirmLabel">Confirm Password</label>
+          <input type="password" id="masterConfirmInput" />
+        </div>
+        <p id="masterHint" style="font-size:12px;color:#666"></p>
+        <menu class="dialog-actions">
+          <button type="button" id="masterSubmitBtn">OK</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <!-- 全屏遮罩锁屏：未解锁前阻止交互与内容可见 -->
+    <!-- 首次运行/强制设置主密码遮罩：阻止进入主界面直至设置完成 -->
+    <div id="setupOverlay" class="lock-overlay" style="display:none;">
+      <div class="lock-card">
+        <h3 id="setupTitle">Setup Required</h3>
+        <p id="setupHint" style="font-size:12px;color:#9aa0b4;">Please set a master password to continue.</p>
+        <!-- 备用设置表单：在某些 WebView 无法渲染 <dialog> 时启用 -->
+        <div class="field" id="setupPwdRow">
+          <label id="setupPwdLabel">Master Password</label>
+          <input type="password" id="setupPwdInput" />
+        </div>
+        <div class="field" id="setupConfirmRow">
+          <label id="setupConfirmLabel">Confirm Password</label>
+          <input type="password" id="setupConfirmInput" />
+        </div>
+        <menu class="dialog-actions">
+          <button id="setupSubmitBtn">OK</button>
+        </menu>
+      </div>
+    </div>
+    <div id="lockOverlay" class="lock-overlay" style="display:none;">
+      <div class="lock-card">
+        <h3 id="lockTitle">Unlock</h3>
+        <p id="lockHint" style="font-size:12px;color:#9aa0b4;">Enter master password to unlock your accounts.</p>
+        <div class="field">
+          <label id="lockPwdLabel">Master Password</label>
+          <input type="password" id="lockPwdInput" required />
+        </div>
+        <menu class="dialog-actions">
+          <button id="lockSubmitBtn">Unlock</button>
+        </menu>
+      </div>
+    </div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+  </html>

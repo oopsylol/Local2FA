@@ -1,0 +1,19 @@
+[package]
+name = "local2fa"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0", features = ["devtools"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+qrcode = "0.12"
+image = { version = "0.24", default-features = false, features = ["png"] }
+base64 = "0.21"
+argon2 = "0.5"
+rand = "0.8"
+chacha20poly1305 = { version = "0.10", features = ["alloc"] }
+notify = "6"
