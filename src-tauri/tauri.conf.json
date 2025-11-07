@@ -1,7 +1,7 @@
 {
   "identifier": "app.local2fa",
   "productName": "Local2FA",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "build": {
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
