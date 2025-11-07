@@ -13,7 +13,7 @@ A lightweight, cross‑platform local TOTP (Time‑based One‑Time Password) ma
 - `src-tauri/`: Tauri config and Rust main process entry.
 - `vite.config.js`: Vite configuration.
 - `package.json`: project dependencies and scripts.
-- `totp_cli.py`, `totp_gui.py`, `pywebview_app.py`, `sidecar.py`: Python helpers/experimental files.
+ (Python helpers/experimental files have been removed; the project does not rely on Python.)
 
 ## Requirements
 - Node.js ≥ 18.

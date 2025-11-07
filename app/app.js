@@ -11,9 +11,9 @@ const CONFIG_KEY = 'local-2fa-config-v1';
 const PREVIEW_SETUP_DONE_KEY = 'local-2fa-preview-setup-done';
 // 浏览器预览模式：保存主密码的 SHA-256（仅用于预览解锁校验）
 const PREVIEW_MASTER_HASH_KEY = 'local-2fa-preview-master-sha256';
-const bridge = (window.pywebview && window.pywebview.api) ? window.pywebview.api : null;
-// Tauri v2 使用 shell.Command 运行外部程序（sidecar）
-const tauriProcess = (window.__TAURI__ && window.__TAURI__.shell) ? window.__TAURI__.shell : null;
+// Python/pywebview 与 sidecar 已移除，保持为 null 以避免误用
+const bridge = null;
+const tauriProcess = null;
 // Tauri 原生命令调用（v1/v2 兼容：core.invoke 或 tauri.invoke）
 const tauriInvoke = (() => {
   const t = window.__TAURI__;
@@ -57,6 +57,17 @@ function updateEnvBadge() {
     el.textContent = on ? 'Tauri: ON' : 'Tauri: OFF';
     el.classList.remove('env-on', 'env-off');
     el.classList.add(on ? 'env-on' : 'env-off');
+  } catch (_) { /* ignore */ }
+}
+
+// 应用构建标记（用于确认当前打开的是最新构建）
+function applyBuildMarker() {
+  try {
+    const el = document.getElementById('buildMarker');
+    if (!el) return;
+    // 固定文本标记 + 运行环境提示
+    const env = getTauriInvoke() ? 'Desktop' : 'Browser';
+    el.textContent = `BUILD-1106 • ${env}`;
   } catch (_) { /* ignore */ }
 }
 
@@ -127,48 +138,8 @@ function generateQrInBrowser(url) {
   }
 }
 
-// 统一封装 sidecar 执行（优先 Sidecar，失败则回退 Command），兼容不同命名
-async function execSidecar(args, { stdin } = {}) {
-  if (!tauriProcess) return { code: -1 };
-  const names = ['sidecar', 'sidecar-aarch64-apple-darwin'];
-  const absPaths = [
-    '/Users/mac/Desktop/workspace/2FA/src-tauri/bin/sidecar-aarch64-apple-darwin',
-    '/Users/mac/Desktop/workspace/2FA/src-tauri/bin/sidecar'
-  ];
-  for (const name of names) {
-    try {
-      let cmd;
-      if (tauriProcess.Sidecar) {
-        cmd = new tauriProcess.Sidecar(name, args);
-      } else if (tauriProcess.Command) {
-        cmd = new tauriProcess.Command(name, args, stdin ? { stdin: 'piped' } : undefined);
-      }
-      if (!cmd) continue;
-      if (stdin && cmd.stdin) {
-        cmd.stdin.write(stdin);
-        cmd.stdin.close();
-      }
-      const res = await cmd.execute();
-      if (typeof res?.code === 'number' && res.code === 0) return res;
-    } catch (_) {
-      // 尝试下一个名称
-    }
-  }
-  // 作为开发模式的兜底：尝试绝对路径执行
-  for (const p of absPaths) {
-    try {
-      if (!tauriProcess.Command) continue;
-      const cmd = new tauriProcess.Command(p, args, stdin ? { stdin: 'piped' } : undefined);
-      if (stdin && cmd.stdin) {
-        cmd.stdin.write(stdin);
-        cmd.stdin.close();
-      }
-      const res = await cmd.execute();
-      if (typeof res?.code === 'number' && res.code === 0) return res;
-    } catch (_) { /* ignore */ }
-  }
-  return { code: -1 };
-}
+// Sidecar 支持已移除：直接返回失败码以禁用相关路径
+async function execSidecar(args, { stdin } = {}) { return { code: -1 }; }
 
 /** Base32 解码（RFC 4648，不含 padding 可兼容） */
 function base32Decode(input) {
@@ -987,6 +958,8 @@ function showSetMasterDialog(opts = {}) {
                       document.body.classList.remove('locked');
                     } catch (_) {}
                     await persistAccounts();
+                    // 设置完成后，主动锁定后端内存密钥，确保立即进入解锁流程
+                    try { await inv3('lock'); } catch (_) {}
                     try {
                       const lang = (state && state.config && state.config.language) || 'en';
                       showNotice(lang === 'zh' ? '设置主密码成功' : 'Master password set successfully');
@@ -1056,6 +1029,8 @@ function showSetMasterDialog(opts = {}) {
       // 写入当前内存的账户（会被加密保存）
       const persistOk = await persistAccounts();
       try { debugLog({ event: 'persist.after', ok: !!persistOk }); } catch (_) {}
+      // 设置完成后，主动锁定后端内存密钥，确保立即进入解锁流程
+      try { await inv2('lock'); } catch (_) {}
       try {
         const lang = (state && state.config && state.config.language) || 'en';
         showNotice(lang === 'zh' ? '设置主密码成功' : 'Master password set successfully');
@@ -1220,6 +1195,8 @@ function bindSetupFallbackSubmit() {
       } catch (_) {}
       const persistOk = await persistAccounts();
       try { debugLog({ event: 'persist.after', ok: !!persistOk, via: 'overlay' }); } catch (_) {}
+      // 设置完成后，主动锁定后端内存密钥，确保立即进入解锁流程
+      try { await inv('lock'); } catch (_) {}
       try {
         const lang = (state && state.config && state.config.language) || 'en';
         showNotice(lang === 'zh' ? '设置主密码成功' : 'Master password set successfully');
@@ -1243,6 +1220,16 @@ function showUnlockDialog() {
   if (masterConfirmRow) masterConfirmRow.style.display = 'none';
   if (masterHint) masterHint.textContent = d.master_hint_unlock;
   if (masterPwdInput) masterPwdInput.value = '';
+  // 清理并替换提交按钮，避免沿用“设置主密码”的点击监听
+  try {
+    const btn = document.getElementById('masterSubmitBtn');
+    if (btn) {
+      const newBtn = btn.cloneNode(true);
+      // 在解锁模式下让按钮触发表单提交
+      try { newBtn.setAttribute('type', 'submit'); } catch (_) {}
+      btn.parentNode && btn.parentNode.replaceChild(newBtn, btn);
+    }
+  } catch (_) {}
   // 避免遮罩与弹窗堆叠导致输入不可见
   try { lockOverlay && lockOverlay.classList.remove('show'); } catch (_) {}
   masterDialog.showModal();
@@ -2168,14 +2155,57 @@ resetBtn && resetBtn.addEventListener('click', async () => {
   } catch (_) {}
   try { updateEnvBadge(); } catch (_) {}
   try { logTauriStatus('init'); } catch (_) {}
+  // 强制重置：当 URL 带 ?forceReset=1 时，无条件执行后直接进入“设置主密码”
+  try {
+    const inv = getTauriInvoke();
+    const urlForce = (() => { try { return new URLSearchParams(location.search).get('forceReset') === '1'; } catch (_) { return false; } })();
+    const onceFlag = (() => { try { return localStorage.getItem('__force_reset_once'); } catch (_) { return null; } })();
+    if (inv && (urlForce || !onceFlag)) {
+      try { debugLog({ event: 'forceReset.trigger', urlForce, onceFlag }); } catch (_) {}
+      await inv('reset_all');
+      // 写入空数组，确保 data.json 处于未加密的明文初始状态
+      try { await inv('write_accounts', { data: JSON.stringify([]) }); } catch (_) {}
+      // 清理预览标记，避免逻辑分支误判
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(CONFIG_KEY);
+        localStorage.removeItem(PREVIEW_SETUP_DONE_KEY);
+        localStorage.removeItem(PREVIEW_MASTER_HASH_KEY);
+      } catch (_) {}
+      try { localStorage.setItem('__force_reset_once', 'done'); } catch (_) {}
+      // 直接进入首次设置流程（不依赖后续 is_encrypted 判断）
+      try {
+        document.body.classList.add('locked');
+        if (setupOverlay) setupOverlay.classList.add('show');
+        showSetMasterDialog();
+      } catch (_) {}
+      return;
+    }
+  } catch (_) {}
   // 在桌面类环境中，优先显示“首次设置”遮罩以阻止直接进入主界面
   try {
     if (isDesktopLike) {
       const previewSetupDone = (() => { try { return !!localStorage.getItem(PREVIEW_SETUP_DONE_KEY); } catch (_) { return false; } })();
-      // Tauri 已注入：正常展示首次设置遮罩
+      // Tauri 已注入：根据加密状态决定显示“设置”或“解锁”
       if (getTauriInvoke()) {
         document.body.classList.add('locked');
-        if (setupOverlay) setupOverlay.classList.add('show');
+        const inv = getTauriInvoke();
+        try {
+          const enc = await inv('is_encrypted');
+          if (enc) {
+            // 已加密：仅显示解锁遮罩，避免误显首次设置
+            if (setupOverlay) setupOverlay.classList.remove('show');
+            showLockOverlay();
+          } else {
+            // 未加密：显示首次设置遮罩并进入设置流程
+            if (setupOverlay) setupOverlay.classList.add('show');
+            showSetMasterDialog();
+          }
+        } catch (_) {
+          // 保守处理：若判断失败则进入解锁遮罩，避免直接暴露内容
+          if (setupOverlay) setupOverlay.classList.remove('show');
+          showLockOverlay();
+        }
       } else if (!previewSetupDone) {
         // 未注入且未完成预览标记：展示遮罩及备用设置
         document.body.classList.add('locked');
@@ -2259,6 +2289,9 @@ resetBtn && resetBtn.addEventListener('click', async () => {
   try { if (getTauriInvoke()) localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
   setupFormValidationI18n();
   setupLangSelectUI();
+  // 应用环境徽章与构建标记
+  try { updateEnvBadge(); } catch (_) {}
+  try { applyBuildMarker(); } catch (_) {}
   let loaded = false;
   let needUnlock = false;
   // 浏览器模拟模式：通过 URL 参数 simulate=lock/encrypted/setup 强制流程

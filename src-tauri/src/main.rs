@@ -72,6 +72,24 @@ fn derive_key(password: &str, salt: &[u8]) -> [u8; 32] {
     out
 }
 
+// 从加密文件的参数派生密钥，兼容不同 Argon2 配置
+fn derive_key_with_params(password: &str, salt: &[u8], params_obj: Option<&serde_json::Value>) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    // 默认参数与当前实现一致
+    let mut m_cost: u32 = 19 * 1024;
+    let mut t_cost: u32 = 2;
+    let mut p_cost: u32 = 1;
+    if let Some(pv) = params_obj.and_then(|v| v.as_object()) {
+        if let Some(mv) = pv.get("m").and_then(|x| x.as_u64()) { m_cost = mv.min(u64::from(u32::MAX)) as u32; }
+        if let Some(tv) = pv.get("t").and_then(|x| x.as_u64()) { t_cost = tv.min(u64::from(u32::MAX)) as u32; }
+        if let Some(pv2) = pv.get("p").and_then(|x| x.as_u64()) { p_cost = pv2.min(u64::from(u32::MAX)) as u32; }
+    }
+    let params = Params::new(m_cost, t_cost, p_cost, None).expect("argon2 params");
+    let a2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+    a2.hash_password_into(password.as_bytes(), salt, &mut out).expect("argon2 derive");
+    out
+}
+
 fn encrypt_json(key_bytes: &[u8; 32], plaintext: &str) -> serde_json::Value {
     let mut salt = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut salt);
@@ -222,7 +240,9 @@ fn unlock(app_handle: tauri::AppHandle, state: State<Mutex<AppState>>, password:
     }
     let salt_b64 = v.get("salt").and_then(|s| s.as_str()).ok_or("missing salt")?;
     let salt = general_purpose::STANDARD.decode(salt_b64).map_err(|e| e.to_string())?;
-    let key = derive_key(&password, &salt);
+    // 读取加密文件中的 Argon2 参数以确保派生一致
+    let params_obj = v.get("params");
+    let key = derive_key_with_params(&password, &salt, params_obj);
     let pt = try_decrypt_json(&key, &v)?;
     state.lock().unwrap().key.replace(key);
     Ok(pt)

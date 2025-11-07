@@ -12,7 +12,7 @@
 - `src-tauri/`：Tauri 桌面应用配置与 Rust 主进程入口。
 - `vite.config.js`：Vite 配置。
 - `package.json`：项目依赖与脚本。
-- `totp_cli.py`、`totp_gui.py`、`pywebview_app.py`、`sidecar.py`：Python 辅助/实验性文件（如需可单独运行）。
+（已移除 Python 辅助/实验性文件，当前项目不依赖 Python。）
 
 ## 环境与依赖
 - Node.js ≥ 18（用于前端开发与构建）。

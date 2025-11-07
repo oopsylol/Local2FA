@@ -9,6 +9,10 @@
   <body>
     <header>
       <h1 data-i18n="title">Local 2FA Manager</h1>
+      <div class="header-meta">
+        <span id="envBadge" class="env-badge" aria-label="Environment"></span>
+        <span id="buildMarker" class="build-marker" aria-label="Build Marker">BUILD-1106</span>
+      </div>
     </header>
 
     <div id="noticeBar" class="notice" role="status" aria-live="polite" style="display:none;"></div>
@@ -185,6 +189,6 @@
 
 
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-    <script src="app.js"></script>
+    <script type="module" src="/app.js"></script>
   </body>
   </html>
